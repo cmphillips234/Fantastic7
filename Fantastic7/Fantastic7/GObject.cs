@@ -40,6 +40,28 @@ namespace Fantastic7
         {
             _sprite.draw(sb, scale);
         }
+
+        public GSprite getSprite()
+        {
+            return _sprite;
+        }
+
+        public Vector2 getPosition()
+        {
+            return _pos;
+        }
+
+        public Rectangle? CollisionRect()
+        {
+            if (_sprite is NSprite)
+            {
+                NSprite n = (NSprite)_sprite;
+                int width = n.getRect().Width;
+                int height = n.getRect().Height;
+                return new Rectangle((int)_pos.X, (int)_pos.Y, width, height);
+            }
+            return null;
+        }
     }
 
     class Entity : GObject
@@ -85,5 +107,7 @@ namespace Fantastic7
         {
             if (regain > 0) modifyHealth(regain);
         }
+
+
     }
 }

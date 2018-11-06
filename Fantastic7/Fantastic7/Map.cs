@@ -24,6 +24,20 @@ namespace Fantastic7
         private const int roomUpperBound = 30;
         private Random r;
 
+        // Used for delay in key presses
+        private int elapsedTime = 0;
+        private int millisecDelay = 50;
+        private bool showMinimap = false;
+        Direction direction;
+
+        enum Direction
+        {
+            North,
+            East,
+            South,
+            West
+        };
+
         private GGUI miniMap;
 
         public Map()
@@ -57,7 +71,7 @@ namespace Fantastic7
                 for (int i = 0; i < size * size; i++) if (_rooms[i] != null) count++;
                 if (count < roomRejectionSize || count > roomUpperBound)
                 {
-                    if(!muteConsole) Console.Out.WriteLine("Retry Generation /////////////////");
+                    if (!muteConsole) Console.Out.WriteLine("Retry Generation /////////////////");
                     for (int i = 0; i < size * size; i++) _rooms[i] = null;
                 }
             } while (count < roomRejectionSize || count > roomUpperBound);
@@ -66,13 +80,13 @@ namespace Fantastic7
 
             //
             //Used for constructing minimap, can be ignorned 
-            List < GSprite > gs = new List<GSprite>();
+            List<GSprite> gs = new List<GSprite>();
 
             gs.Add(new NSprite(new Rectangle(0, 0, 10 + 100 * size, 10 + 100 * size), Color.Black));
 
-            for(int i = 0; i < size; i++)
+            for (int i = 0; i < size; i++)
             {
-                for(int j = 0; j < size; j++)
+                for (int j = 0; j < size; j++)
                 {
                     if (_rooms[i + size * j] != null)
                     {
@@ -82,9 +96,9 @@ namespace Fantastic7
                 }
             }
 
-            for(int i = 0; i < size; i++)
+            for (int i = 0; i < size; i++)
             {
-                for(int j = 0; j < size; j++)
+                for (int j = 0; j < size; j++)
                 {
                     if (_rooms[i + size * j] != null)
                     {
@@ -94,7 +108,7 @@ namespace Fantastic7
                 }
             }
             miniMap = new GGUI(gs.ToArray(), null, Color.Beige);
-            if (!muteConsole)  Console.Out.WriteLine("Complete");
+            if (!muteConsole) Console.Out.WriteLine("Complete");
             //End minimap section
             //
 
@@ -145,8 +159,8 @@ namespace Fantastic7
                     if (!muteConsole) Console.Out.WriteLine("Direction Pop");
                     a.Remove(a.ElementAt(r.Next(a.Count())));
                 }
-                
-                if(a.Count > 0)
+
+                if (a.Count > 0)
                 {
                     sel = r.Next(a.Count); //Picks a random direction that is still unattempted
                     switch (a.ElementAt(sel))
@@ -154,7 +168,8 @@ namespace Fantastic7
                         case 0:
                             if (_rooms[x + 1 + size * y] == null)//Checks if the direction does not have a room and creates one
                             {
-                                _rooms[x + 1 + size * y] = new Room();
+                                //_rooms[x + 1 + size * y] = new Room();
+                                _rooms[x + 1 + size * y] = CreateRandRoom();
                                 _rooms[x + 1 + size * y].left = _rooms[x + size * y];
                                 _rooms[x + size * y].right = _rooms[x + 1 + size * y];
                                 stack.Push(_rooms[x + 1 + size * y]);
@@ -174,7 +189,8 @@ namespace Fantastic7
                         case 1:
                             if (_rooms[x + size * (y - 1)] == null)
                             {
-                                _rooms[x + size * (y - 1)] = new Room();
+                                //_rooms[x + size * (y - 1)] = new Room();
+                                _rooms[x + size * (y - 1)] = CreateRandRoom();
                                 _rooms[x + size * (y - 1)].down = _rooms[x + size * y];
                                 _rooms[x + size * y].up = _rooms[x + size * (y - 1)];
                                 stack.Push(_rooms[x + size * (y - 1)]);
@@ -194,7 +210,8 @@ namespace Fantastic7
                         case 2:
                             if (_rooms[x - 1 + size * y] == null)
                             {
-                                _rooms[x - 1 + size * y] = new Room();
+                                //_rooms[x - 1 + size * y] = new Room();
+                                _rooms[x - 1 + size * y] = CreateRandRoom();
                                 _rooms[x - 1 + size * y].right = _rooms[x + size * y];
                                 _rooms[x + size * y].left = _rooms[x - 1 + size * y];
                                 stack.Push(_rooms[x - 1 + size * y]);
@@ -214,7 +231,8 @@ namespace Fantastic7
                         case 3:
                             if (_rooms[x + size * (y + 1)] == null)
                             {
-                                _rooms[x + size * (y + 1)] = new Room();
+                                //_rooms[x + size * (y + 1)] = new Room();
+                                _rooms[x + size * (y + 1)] = CreateRandRoom();
                                 _rooms[x + size * (y + 1)].up = _rooms[x + size * y];
                                 _rooms[x + size * y].down = _rooms[x + size * (y + 1)];
                                 stack.Push(_rooms[x + size * (y + 1)]);
@@ -244,6 +262,18 @@ namespace Fantastic7
         public void update(GameTime gt)
         {
             _currRoom.update(gt);
+
+            elapsedTime += gt.ElapsedGameTime.Milliseconds;
+            if (elapsedTime > millisecDelay)
+            {
+                elapsedTime = 0;
+                //bring up minimap
+                if (Keyboard.GetState().IsKeyDown(Keys.Tab))
+                {
+                    showMinimap = !showMinimap;
+                }
+            }
+            MovePlayer();
         }
 
         public void changeRoom(int i)
@@ -253,11 +283,152 @@ namespace Fantastic7
 
         public void draw(SpriteBatchPlus sb, float scale)
         {
-            _currRoom.draw(sb,scale);
+            _currRoom.draw(sb, scale);
 
             //This draws the map over top off the room
             //Used for testing purposes when checking the map generation
-            //miniMap.draw(sb, scale); 
+            if (showMinimap)
+            {
+                miniMap.draw(sb, scale);
+            }
+        }
+
+        /// <summary>
+        /// Uses wasd keys to move player within bounds of room. Detects when player
+        /// touches a door object.
+        /// </summary>
+        public void MovePlayer()
+        {
+            int speed = 10;
+            KeyboardState keyboardState = Keyboard.GetState();
+
+            if (keyboardState.IsKeyDown(Keys.W))
+                _player.move(new Vector2(0, -speed));
+            if (keyboardState.IsKeyDown(Keys.S))
+                _player.move(new Vector2(0, speed));
+            if (keyboardState.IsKeyDown(Keys.A))
+                _player.move(new Vector2(-speed, 0));
+            if (keyboardState.IsKeyDown(Keys.D))
+                _player.move(new Vector2(speed, 0));
+
+            int playerX = (int)_player.getPosition().X;
+            int playerY = (int)_player.getPosition().Y;
+            int playerWidth = _player.CollisionRect().Value.Width;
+            int playerHeight = _player.CollisionRect().Value.Height;
+
+            // Room collision detection test. Limit movement to match inner rectangle (floor) dimensions
+            if (_player.getPosition().X < _currRoom.floor.X)
+                _player.jumpTo(new Vector2(_currRoom.floor.X, playerY));
+            if (_player.getPosition().X > (_currRoom.floor.X + _currRoom.floor.Width - playerWidth))
+                _player.jumpTo(new Vector2((_currRoom.floor.X + _currRoom.floor.Width - playerWidth), playerY));
+            if (_player.getPosition().Y < _currRoom.floor.Y)
+                _player.jumpTo(new Vector2(playerX, _currRoom.floor.Y));
+            if (_player.getPosition().Y > (_currRoom.floor.Y + _currRoom.floor.Height - playerHeight))
+                _player.jumpTo(new Vector2(playerX, (_currRoom.floor.Y + _currRoom.floor.Height - playerHeight)));
+
+            CheckDoorCollision();
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public void CheckDoorCollision()
+        {
+            GObject[] doors = _currRoom.getDoors();
+            foreach (GObject door in doors)
+            {
+                if (_player.CollisionRect().Value.Intersects(door.CollisionRect().Value))
+                {
+                    int doorY = door.CollisionRect().Value.Y;
+                    int doorX = door.CollisionRect().Value.X;
+                    int doorIndex = -1;
+
+                    // Looking for which side door player is touching
+                    if (doorY <= 0 && doorX < 1280 / 2)
+                    {
+                        doorIndex = getRoom(_currRoom.up);
+                        direction = Direction.North;
+                    }
+                    else if (doorX <= 0 && doorY < 720 / 2)
+                    {
+                        doorIndex = getRoom(_currRoom.left);
+                        direction = Direction.West;
+                    }
+                    else if (doorX > 1000 && doorY < 720 / 2)
+                    {
+                        doorIndex = getRoom(_currRoom.right);
+                        direction = Direction.East;
+                    }
+                    else
+                    {
+                        doorIndex = getRoom(_currRoom.down);
+                        direction = Direction.South;
+                    }
+
+                    // Changing rooms and also moving player into new room while facing correct position
+                    if (doorIndex != -1)
+                    {
+                        _currRoom.removeObject(_player);
+                        changeRoom(doorIndex);
+                        // move player to new room
+                        //_player = (Entity)g;
+                        _currRoom.addObject(_player);
+                        // Based on door entered, reposition player location
+                        if (direction.Equals(Direction.North))
+                            _player.jumpTo(new Vector2(1280 / 2, 720 - 190));
+                        else if (direction.Equals(Direction.East))
+                            _player.jumpTo(new Vector2(190, 720 / 2));
+                        else if (direction.Equals(Direction.South))
+                            _player.jumpTo(new Vector2(1280 / 2, 190));
+                        else if (direction.Equals(Direction.West))
+                            _player.jumpTo(new Vector2(1280 - 190, 720 / 2));
+                    }
+
+                    Console.Out.WriteLine("Player touched door at X:" +
+                        door.CollisionRect().Value.X + " Y: " + door.CollisionRect().Value.Y);
+                }
+            }
+        }
+
+        public Room CreateRandRoom()
+        {
+            Room room;
+            int mobRoomChance = 60;
+            int treasureRoomChance = 10;
+            int trapRoomChance = 30;
+
+            if (mobRoomChance > r.Next(100))
+            {
+                room = new MonsterRoom();
+            }
+            else if (treasureRoomChance > r.Next(100))
+            {
+                room = new TreasureRoom();
+            }
+            else if (trapRoomChance > r.Next(100))
+            {
+                room = new TrapRoom();
+            }
+            else
+            {
+                room = new Room();
+            }
+
+            return room;
+
+        }
+
+        public int getRoom(Room room)
+        {
+            if (room == null)
+                return -1;
+
+            for (int i = 0; i < _rooms.Length; i++)
+            {
+                if (_rooms[i] == room)
+                    return i;
+            }
+            return -1;
         }
     }
 }
